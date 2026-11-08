@@ -76,6 +76,8 @@ export const foods = pgTable(
     source: foodSource("source").notNull().default("custom"),
     /** USDA FDC id or Open Food Facts code, for de-duplicated imports. */
     sourceId: text("source_id"),
+    /** Which release of the source a food came from ("foundation", "sr_legacy"), so duplicates can be told apart. */
+    dataset: text("dataset"),
     barcode: text("barcode"),
     ownerId: uuid("owner_id").references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

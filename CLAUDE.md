@@ -13,6 +13,8 @@ TypeScript, Next.js (App Router), PostgreSQL 16, Drizzle ORM, Vitest. Read `READ
 - `npm run db:generate`: after editing `src/db/schema.ts`, generate a migration and commit
   everything in `drizzle/`. Never hand-edit a migration that has already been applied anywhere.
 - `npm run db:migrate`, `npm run db:seed`: apply migrations / upsert the nutrient catalogue
+- `npm run db:import:usda`: import USDA SR Legacy + Foundation foods (~8,200); safe to re-run; needs
+  network access to fdc.nal.usda.gov (or `--file` with a downloaded zip)
 
 ## Conventions
 
@@ -26,5 +28,6 @@ TypeScript, Next.js (App Router), PostgreSQL 16, Drizzle ORM, Vitest. Read `READ
   resolve the `@/` alias); `@/` is fine inside `src/app`.
 - Do not put real or invented food nutrition data in fixtures presented as real. Test data must
   be obviously synthetic (round numbers, "Test ..." names).
-- `usdaNumber` mappings in the catalogue are unverified; check them against FoodData Central
-  before building the importer on them.
+- `usdaNumber` mappings in the catalogue were verified against FoodData Central's `nutrient.csv`
+  (existence, name, unit). The importer re-checks them on every run and aborts on a mismatch;
+  re-verify when adding a mapping or moving to a new USDA release.

@@ -34,7 +34,7 @@ erDiagram
 | --- | --- |
 | `users` | Account, timezone, unit system, sex / birth date / height (for future personalised targets) |
 | `nutrients` | Catalogue of trackable nutrients, seeded from `nutrient-catalog.ts` |
-| `foods` | Foods. `owner_id` null = shared/imported, set = a user's custom food |
+| `foods` | Foods. `owner_id` null = shared/imported, set = a user's custom food. Imported foods carry `source` (`usda`, `off`), `source_id` (USDA FDC id or barcode, unique per source) and `dataset` (`sr_legacy`, `foundation`) |
 | `food_nutrients` | Nutrient amounts **per 100 g** |
 | `food_servings` | Named portions with a gram weight; at most one default per food |
 | `diary_entries` | One logged food: date, meal, quantity, resolved grams |
@@ -74,3 +74,5 @@ erDiagram
   supplements only, for limits defined for supplemental intake (magnesium, niacin, vitamin E).
 - **Exercise stays minimal on purpose.** The gym tracker will add its own workout tables rather than
   stretch this one.
+- **Imported foods are matched by `(source, source_id)`.** Re-running an importer updates names and
+  replaces nutrient amounts, and never deletes servings, because diary entries reference them.

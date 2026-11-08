@@ -15,6 +15,13 @@
       "when": 1794112557267,
       "tag": "0001_yummy_lady_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794115408793,
+      "tag": "0002_married_grim_reaper",
+      "breakpoints": true
     }
   ]
 }

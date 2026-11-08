@@ -2,12 +2,13 @@ import { Plus, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db/client";
-import { listRecentFoods, searchFoods, type FoodListItem } from "@/db/queries";
+import { countSharedFoods, listRecentFoods, searchFoods, type FoodListItem } from "@/db/queries";
 import { formatKcal, formatNumber } from "@/lib/format";
 import { isMeal, MEAL_LABELS, MEALS, type Meal } from "@/lib/meals";
 import { getCurrentUser, resolveDate } from "@/server/context";
 import { btnPrimary, btnSecondary, input } from "../../_components/styles";
 import { EmptyState, PageHeader } from "../../_components/ui";
+import { BarcodeLookup } from "./BarcodeLookup";
 
 export const metadata: Metadata = { title: "Add food" };
 
@@ -25,7 +26,10 @@ export default async function AddFoodPage({
   const meal: Meal = isMeal(mealParam) ? mealParam : "breakfast";
   const q = (first(sp.q) ?? "").trim();
 
-  const results = q ? await searchFoods(getDb(), user.id, q) : await listRecentFoods(getDb(), user.id);
+  const [results, sharedFoods] = await Promise.all([
+    q ? searchFoods(getDb(), user.id, q) : listRecentFoods(getDb(), user.id),
+    countSharedFoods(getDb()),
+  ]);
   const newFoodHref = `/foods/new?date=${date}&meal=${meal}${q ? `&name=${encodeURIComponent(q)}` : ""}`;
 
   return (
@@ -66,6 +70,15 @@ export default async function AddFoodPage({
         </button>
       </form>
 
+      {sharedFoods === 0 ? (
+        <p className="mb-4 rounded-xl bg-low-soft p-3 text-sm text-low">
+          No food database has been imported yet, so only your own foods and barcode lookups are available. Run{" "}
+          <code className="font-mono">npm run db:import:usda</code> to add about 8,000 USDA foods.
+        </p>
+      ) : null}
+
+      <BarcodeLookup date={date} meal={meal} />
+
       <h2 className="mb-2 text-sm font-semibold text-muted">{q ? `Results for “${q}”` : "Recently logged"}</h2>
 
       {results.length > 0 ? (
@@ -96,14 +109,25 @@ function FoodRow({ food, href }: { food: FoodListItem; href: string }) {
   const serving = food.defaultServing
     ? `${food.defaultServing.label} (${formatNumber(food.defaultServing.grams, 0)} g)`
     : "per 100 g";
+  const origin =
+    food.source === "off"
+      ? " · Open Food Facts"
+      : food.custom
+        ? " · Yours"
+        : food.dataset === "foundation"
+          ? " · USDA Foundation"
+          : food.dataset === "sr_legacy"
+            ? " · USDA SR Legacy"
+            : "";
   return (
     <li className="border-b border-line last:border-b-0">
       <Link href={href} className="flex min-h-14 items-center justify-between gap-3 px-4 py-2 active:bg-surface-2">
         <span className="min-w-0">
-          <span className="block truncate font-medium">{food.name}</span>
+          <span className="line-clamp-2 font-medium">{food.name}</span>
           <span className="block truncate text-sm text-muted">
             {food.brand ? `${food.brand} · ` : ""}
             {serving}
+            {origin}
           </span>
         </span>
         <span className="shrink-0 text-right text-sm text-muted">

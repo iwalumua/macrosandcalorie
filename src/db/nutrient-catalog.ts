@@ -11,9 +11,13 @@
  *   budget the user sets). `upperLimit` is an adult Tolerable Upper Intake
  *   Level. Neither is stored in the database; the summary code reads them from
  *   here, so changing them needs no migration.
- * - `usdaNumber` maps to the USDA FoodData Central nutrient number, for the
- *   future importer. Left undefined where the number has not been confirmed.
- *   Verify every mapping against FDC before relying on it in the importer.
+ * - `usdaNumber` is the USDA FoodData Central nutrient number the importer
+ *   reads. Every number here was checked against FDC's own `nutrient.csv`
+ *   (SR Legacy 2018-04 and Foundation 2026-04-30 releases) for existence, name
+ *   and unit. The importer re-checks existence and unit on every run and
+ *   aborts on a mismatch, so a USDA renumbering cannot silently corrupt data.
+ *   Energy is also available as Atwater values (957, 958) for foods that have
+ *   no 208; the importer handles that fallback, it is not a separate nutrient.
  */
 
 export const NUTRIENT_UNITS = ["kcal", "g", "mg", "mcg", "IU"] as const;
@@ -103,7 +107,14 @@ export const NUTRIENT_CATALOG: readonly NutrientDef[] = [
     },
     { key: "fiber", name: "Fiber", unit: "g", usdaNumber: "291", dailyValue: 28 },
     { key: "sugars", name: "Sugars", unit: "g", usdaNumber: "269" },
-    { key: "added_sugars", name: "Added Sugars", unit: "g", dailyValue: 50, direction: "limit" },
+    {
+      key: "added_sugars",
+      name: "Added Sugars",
+      unit: "g",
+      usdaNumber: "539",
+      dailyValue: 50,
+      direction: "limit",
+    },
     {
       key: "fat",
       name: "Fat",
@@ -195,9 +206,9 @@ export const NUTRIENT_CATALOG: readonly NutrientDef[] = [
     { key: "copper", name: "Copper", unit: "mg", usdaNumber: "312", dailyValue: 0.9, upperLimit: 10 },
     { key: "manganese", name: "Manganese", unit: "mg", usdaNumber: "315", dailyValue: 2.3, upperLimit: 11 },
     { key: "selenium", name: "Selenium", unit: "mcg", usdaNumber: "317", dailyValue: 55, upperLimit: 400 },
-    { key: "iodine", name: "Iodine", unit: "mcg", dailyValue: 150, upperLimit: 1100 },
-    { key: "chromium", name: "Chromium", unit: "mcg", dailyValue: 35 },
-    { key: "molybdenum", name: "Molybdenum", unit: "mcg", dailyValue: 45, upperLimit: 2000 },
+    { key: "iodine", name: "Iodine", unit: "mcg", usdaNumber: "314", dailyValue: 150, upperLimit: 1100 },
+    { key: "chromium", name: "Chromium", unit: "mcg", usdaNumber: "310", dailyValue: 35 },
+    { key: "molybdenum", name: "Molybdenum", unit: "mcg", usdaNumber: "316", dailyValue: 45, upperLimit: 2000 },
   ]),
   ...group("other", [
     { key: "water", name: "Water", unit: "g", usdaNumber: "255" },

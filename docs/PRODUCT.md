@@ -63,10 +63,10 @@ nutrition maths, daily-totals query, tests.
 - [x] Daily dashboard: calories and macros vs target, micronutrients vs Daily Value
 - [x] Custom foods from label values; food search (every word, name or brand)
 - [x] Day Summary and Complete day
-- [ ] **USDA FoodData Central importer**: nutrient mapping and portion sizes (needs network access
-      and verified nutrient numbers; this is the biggest gap)
+- [x] **USDA FoodData Central importer** (SR Legacy + Foundation, verified mapping, re-runnable)
+- [x] Barcode lookup on Open Food Facts by typed number
 - [ ] Authentication (see [DECISIONS](DECISIONS.md#auth-undecided))
-- [ ] Trigram search (`pg_trgm`) once there are thousands of foods
+- [ ] Trigram search (`pg_trgm`): measured at a 13 ms median over 8,200 foods, so not needed yet
 
 ### Phase 2: supplements (mostly done)
 - [x] Supplement products entered from a label, per-serving nutrients
@@ -83,7 +83,8 @@ nutrition maths, daily-totals query, tests.
 - [ ] Recipes (computed from ingredients), saved meals, copy a day or meal
 
 ### Phase 4: extras
-- Barcode scanning via Open Food Facts
+- Camera barcode scanning (typed lookup already works)
+- More food databases (see Data sources)
 - Weight and body measurements; water
 - CSV export; offline use; installable PWA with a service worker
 
@@ -108,10 +109,48 @@ selling or sharing user data.
 
 ## Data sources & licensing
 
-- **USDA FoodData Central**: public domain (CC0). Primary source for verified foods.
-- **Open Food Facts**: ODbL database licence. Attribution and share-alike apply, so check the
-  terms before storing and redistributing its data. Planned for barcode lookups only.
-- **Cronometer's database (NCCDB)** is proprietary; we do not use it.
+What is used, and what was actually checked (on 2026-11-08, from each source's own pages).
+
+**USDA FoodData Central: used.** Licence, as published by USDA: *"USDA FoodData Central data are in
+the public domain and they are not copyrighted. They are published under CC0 1.0 Universal (CC0
+1.0). No permission is needed for their use, but we request that users list FoodData Central as the
+source."* (fdc.nal.usda.gov/api-guide). The app credits it next to every USDA food.
+
+- Imported: **SR Legacy** (April 2018, 7,793 foods, all complete) and **Foundation Foods**
+  (April 2026 release, 428 of its 469 foods; see the Foundation notes below).
+- Not imported: **Branded Foods** (431 MB zipped; packaged foods come from barcode lookups instead)
+  and the Survey (FNDDS) dataset.
+- All 45 catalogue nutrient numbers were checked against FDC's own `nutrient.csv`, including the four
+  that had been left unmapped (added sugars 539, iodine 314, chromium 310, molybdenum 316).
+- Foundation notes, each found in the real files: its `food.csv` has ~88,000 rows but only 469 are
+  foods (the rest are lab samples); most carry Atwater energy (957/958) instead of 208; 40 have no
+  energy and no macros at all (olive oil, salt, rhubarb...) and are skipped because logging them
+  would silently count 0 kcal (SR Legacy has them completely); the newest archive (2026-10-29) is
+  missing `food.csv` and `food_nutrient.csv`, so releases are pinned and archives validated.
+
+**Open Food Facts: used for barcode lookups.** Terms, as published by Open Food Facts: the database
+is under the **Open Database License (ODbL)**, individual contents under the **Database Contents
+License (DbCL)**, and product images under **CC-BY-SA** (world.openfoodfacts.org/terms-of-use and
+/data). Reusers must attribute ("Contains data from Open Food Facts, available under the Open
+Database License", which is the wording the app uses), and keep share-alike terms if they
+redistribute the database or a derived one.
+
+- Only the product a person looks up is stored, on demand, never a bulk copy, and **no images**.
+- It is volunteer-entered, so lookups are treated with suspicion: impossible values are dropped,
+  products whose macros exceed 100 g per 100 g are refused, and nutrients with ambiguous
+  definitions (vitamin A, folate, alcohol) are not imported. The app tells people to check the label.
+- If the app is ever published with a shared database of stored products, re-read the share-alike
+  terms first. These rows are marked `source = 'off'` so they can be separated.
+- Requests send a User-Agent identifying the app, as Open Food Facts asks, and are rate limited.
+
+**Cronometer's database (NCCDB)** is proprietary; we do not use it.
+
+**Other free databases: not built, licences not checked.** Candidates for later, each needing its own
+verified mapping: Canadian Nutrient File, UK McCance and Widdowson (CoFID), Australian
+AUSNUT/NUTTAB, and regional tables for foods the US sets miss. (The Health Canada site did not
+respond from the build sandbox.) Commercial APIs with free tiers (Nutritionix, Edamam, FatSecret) are
+not planned: their terms generally restrict storing and redistributing results, so "free to call" is
+not "free to keep".
 
 ## Safety
 

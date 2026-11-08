@@ -61,13 +61,30 @@ Generic FDA Daily Values by default; a user target replaces one nutrient. Saving
 stores only the rows the user changed, so improving a default later still reaches everyone who did
 not customise it.
 
-## Open
+### Food data: curated USDA datasets in bulk, Open Food Facts one product at a time
+USDA SR Legacy and Foundation are imported once (about 8,200 foods, public domain, curated), because
+this product's premise is verified data. Open Food Facts is crowd-sourced, so it is used only when
+someone looks up a barcode, stored on first use, never imported in bulk. Packaged-food data we have
+no source for is entered from the label. What shaped the importer, all from the real files:
+- Releases are **pinned**, not "latest": USDA published a Foundation archive missing its main
+  tables. Archives are validated and the importer aborts with a clear message.
+- Nutrient numbers are **re-verified against each dataset's own table on every run**, and the run
+  aborts on a mismatch, so a renumbering cannot silently store wrong values.
+- Only real foods are imported (469 of Foundation's 87,990 rows). Energy falls back to Atwater
+  values, then to an estimate from macros. Foods with no energy and no macros are skipped, since
+  logging them would silently count 0 kcal.
+- **Re-importing never deletes servings.** Diary entries reference them with `ON DELETE SET NULL`,
+  so deleting one would turn "2 x 1 cup" into "2 grams". Existing servings are updated by label.
+- Every imported value was compared with the source CSVs by an independent implementation: all
+  276,507 values identical.
+- Search ranks foods containing all the words (whole words, plurals allowed), then raw over processed,
+  then words in the first two parts of the name ("Fish, salmon, ..."), because USDA names read
+  "category, item, qualifiers". A plain "starts with" rule put Eggnog above eggs.
+- Duplicate names across datasets (SR Legacy and Foundation both publish "Broccoli, raw") are
+  labelled with their dataset, and Foundation wins an exact tie.
+Licensing and verification details: [PRODUCT](PRODUCT.md#data-sources--licensing).
 
-### Food data (the biggest gap)
-There is no food database yet, so foods are entered from labels. Plan: import USDA FoodData
-Central (public domain) for verified foods. Before building on it, the `usdaNumber` mappings in
-the catalogue must be checked against FDC, and a development environment needs network access to
-`api.nal.usda.gov` or the bulk downloads on `fdc.nal.usda.gov`.
+## Open
 
 ### Auth (undecided)
 Options:
@@ -81,4 +98,7 @@ Likely Vercel for Next.js plus a managed Postgres (Neon or Supabase). Nothing in
 depends on the choice; `DATABASE_URL` is the only coupling.
 
 ### Food search
-`pg_trgm` trigram index on food name/brand is planned for Phase 1. Revisit if relevance is poor.
+Plain `ilike` with a computed ranking is fast enough (13 ms median, 46 ms worst over 8,200 foods).
+Revisit `pg_trgm` if the catalogue reaches the hundreds of thousands, or if typo tolerance matters.
+Known rough edges: USDA's first-listed portion is the default ("1 cup, mashed" for bananas, not "1
+medium"), and some foods appear twice because USDA publishes duplicate Foundation entries.

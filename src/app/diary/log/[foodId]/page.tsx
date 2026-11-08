@@ -5,6 +5,7 @@ import { getDb } from "@/db/client";
 import { getDiaryDay, getFood } from "@/db/queries";
 import { isMeal, type Meal } from "@/lib/meals";
 import { getCurrentUser, resolveDate } from "@/server/context";
+import { FoodAttribution } from "../../../_components/FoodAttribution";
 import { SubmitButton } from "../../../_components/forms";
 import { btnDanger } from "../../../_components/styles";
 import { Card, PageHeader } from "../../../_components/ui";
@@ -60,6 +61,8 @@ export default async function LogFoodPage({
         meal={meal}
         entry={existing ? { id: existing.id, quantity: existing.quantity, servingId: existing.servingId } : undefined}
       />
+
+      <FoodAttribution source={food.source} />
 
       {existing ? (
         <Card className="mt-6">

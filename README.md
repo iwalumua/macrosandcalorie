@@ -5,9 +5,10 @@ A daily tracker for **calories, macros, micronutrients and supplements**, modell
 measures up against your nutrient targets. Mobile-first, and the first part of a wider health
 tracker (a gym and exercise tracker comes later).
 
-> **Status: working app, no food database yet.** You can log foods, supplements and exercise, set
-> targets, and get a Day Summary. Foods have to be entered from labels until the USDA importer is
-> built. See [what is not built](#not-built-yet) and the [roadmap](docs/PRODUCT.md#roadmap).
+> **Status: working app with a real food database.** Log foods, supplements and exercise, set
+> targets, and get a Day Summary. About 8,200 USDA foods can be imported, and packaged foods can be
+> found by barcode number. See [what is not built](#not-built-yet) and the
+> [roadmap](docs/PRODUCT.md#roadmap).
 
 ## What it does
 
@@ -20,7 +21,10 @@ tracker (a gym and exercise tracker comes later).
   what is left, and warnings when supplements push a nutrient past its general adult upper limit.
 - **Targets**: the generic FDA adult Daily Values by default (clearly labelled as generic), or your
   own calorie goal, macro split and per-nutrient targets.
-- **Foods from labels**: enter a food's label values and it is stored per 100 g.
+- **Food database**: about 8,200 foods from USDA FoodData Central (SR Legacy and Foundation),
+  searched by every word. Type a barcode number to find a packaged food on Open Food Facts, which
+  is stored locally after the first lookup.
+- **Foods from labels**: or enter a food's label values yourself; it is stored per 100 g.
 - **Exercise**: log calories burned; they raise that day's calorie budget.
 
 ## Stack
@@ -40,11 +44,33 @@ cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 docker compose up -d        # optional: local Postgres on :5432 (also creates the _test database)
 npm run db:migrate          # apply SQL migrations
 npm run db:seed             # load the nutrient catalogue (safe to re-run)
+npm run db:import:usda      # download and import ~8,200 USDA foods (safe to re-run)
 npm run dev                 # http://localhost:3000
 ```
 
 To see it on a phone, see [docs/PLATFORM.md](docs/PLATFORM.md). In short, use the production build:
 `npm run build`, then `SINGLE_USER_MODE=true npm start -- -H 0.0.0.0`.
+
+### Food data
+
+`npm run db:import:usda` downloads two pinned USDA datasets and stores them: **SR Legacy** (7,793
+foods, April 2018) and **Foundation Foods** (428 foods, April 2026 release). It takes about a minute
+and is safe to re-run: foods are matched by USDA id, nutrient values are refreshed, and portions you
+have already logged against are never removed.
+
+```bash
+npm run db:import:usda -- --dataset foundation      # just one dataset
+npm run db:import:usda -- --dry-run                 # parse and report, write nothing
+npm run db:import:usda -- --dataset sr_legacy --file C:\Downloads\sr_legacy.zip   # from a zip you downloaded
+```
+
+If the download fails, the error says why. Behind a proxy, set `NODE_USE_ENV_PROXY=1` and
+`HTTPS_PROXY`, or download the zip in a browser and use `--file`.
+
+Credit: nutrition data from [USDA FoodData Central](https://fdc.nal.usda.gov) (public domain, CC0 1.0)
+and, for barcode lookups, [Open Food Facts](https://world.openfoodfacts.org) (Open Database License).
+Both are credited in the app next to the food. Details and what was verified:
+[docs/PRODUCT.md](docs/PRODUCT.md#data-sources--licensing).
 
 ### There is no login yet
 
@@ -82,10 +108,11 @@ src/server/           Request context (current user, local "today") and form par
 src/db/schema.ts      Drizzle schema: the source of truth for the database
 src/db/nutrient-catalog.ts   The trackable nutrients, their reference values and upper limits
 src/db/queries.ts     Read queries (day totals, diary, food search, supplements, targets)
+src/db/import-*.ts    Food importers: USDA (CLI) and the shared database upsert
 src/db/mutations.ts   Writes, each scoped to the user and validated
 src/db/day.ts         Loads a whole day and builds its summary
 src/lib/              Pure logic, no database or framework: nutrition maths, targets,
-                      the day summary, dates, formatting
+                      the day summary, dates, formatting, CSV, USDA and Open Food Facts mapping
 drizzle/              Generated SQL migrations: commit these
 tests/                Vitest tests
 docs/                 Product spec & roadmap, data model, decisions, platform
@@ -95,9 +122,10 @@ docs/                 Product spec & roadmap, data model, decisions, platform
 
 Honest list of what this does not do today:
 
-- **No food database.** Foods are entered from labels. A USDA FoodData Central importer is next; it
-  needs network access to USDA and its nutrient-number mappings must be verified first (they are
-  marked unverified in the catalogue).
+- **No camera barcode scanning.** You type the number under the barcode. Scanning is planned.
+- **USDA Branded Foods are not imported** (the download is 431 MB zipped). Packaged foods come from
+  barcode lookups instead. Foods that exist in neither can be entered from the label.
+- **No other food databases yet.** USDA and Open Food Facts only (see the roadmap for candidates).
 - **No login or multiple users.** See above.
 - **Generic targets.** The defaults are the FDA adult Daily Values, not personalised by age or sex.
 - **Exercise is manual:** you type the calories burned. There is no workout or gym tracking yet.

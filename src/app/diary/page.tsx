@@ -230,7 +230,7 @@ function EntryRow({ entry, date }: { entry: DiaryEntryView; date: string }) {
         className="flex min-h-14 items-center justify-between gap-3 py-2"
       >
         <span className="min-w-0">
-          <span className="block truncate font-medium">{entry.name}</span>
+          <span className="line-clamp-2 font-medium">{entry.name}</span>
           <span className="block truncate text-sm text-muted">
             {entry.brand ? `${entry.brand} · ` : ""}
             {amount}

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { wordPattern } from "../src/db/queries";
 import type { NutrientDef } from "../src/db/nutrient-catalog";
 import { addDays, formatDayLabel, formatDayLong, isDateString, isValidTimeZone, todayIn } from "../src/lib/dates";
 import { isMeal, MEALS } from "../src/lib/meals";
@@ -94,5 +95,14 @@ describe("resolveTargets", () => {
 
   it("treats a target of 0 as no target", () => {
     expect(resolveTargets(catalog, { a: { target: 0, upperLimit: null } }).a!.target).toBeNull();
+  });
+});
+
+describe("wordPattern", () => {
+  it("builds a whole-word pattern with an optional plural, and escapes everything else", () => {
+    expect(wordPattern("egg")).toBe("\\megg(s|es)?\\M");
+    expect(wordPattern("a.b")).toBe("\\ma\\.b(s|es)?\\M");
+    expect(wordPattern("(x)")).toBe("\\m\\(x\\)(s|es)?\\M");
+    expect(wordPattern("o'neil")).toBe("\\mo\\'neil(s|es)?\\M");
   });
 });

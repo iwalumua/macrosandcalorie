@@ -43,7 +43,8 @@ function cleanText(value: string | null | undefined, label: string, required: bo
   return text;
 }
 
-async function nutrientIds(ex: Executor): Promise<Map<string, number>> {
+/** Nutrient key -> database id. Throws if the catalogue has not been seeded. */
+export async function nutrientIds(ex: Executor): Promise<Map<string, number>> {
   const rows = await ex.select({ id: nutrients.id, key: nutrients.key }).from(nutrients);
   if (rows.length === 0) {
     throw new Error("The nutrients table is empty. Run `npm run db:seed` first.");

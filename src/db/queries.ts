@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, isNull, max, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, max, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "./client";
 import {
   diaryDays,
@@ -78,6 +78,18 @@ function toAmounts(rows: { key: string; amount: number }[]): NutrientAmounts {
 /** The four values shown beside a food in lists and used for per-meal totals. */
 const LIST_KEYS = ["energy_kcal", "protein", "carbs", "fat"] as const;
 
+/** "raw" as a whole word. Passed as a parameter: backslashes inside a JS template literal would be dropped. */
+const RAW_WORD = "\\mraw\\M";
+
+/**
+ * A regular expression (Postgres syntax) matching `word` as a whole word, with an
+ * optional plural ending, so "egg" matches "Eggs" but not "Eggnog". Every
+ * character is escaped, so user text can never act as a pattern.
+ */
+export function wordPattern(word: string): string {
+  return `\\m${word.replace(/[^A-Za-z0-9]/g, (c) => `\\${c}`)}(s|es)?\\M`;
+}
+
 /** Escape `%`, `_` and `\` so user text is matched literally by LIKE/ILIKE. */
 export function escapeLike(text: string): string {
   return text.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -88,6 +100,8 @@ export interface FoodListItem {
   name: string;
   brand: string | null;
   source: "usda" | "off" | "custom";
+  /** Which USDA release ("foundation", "sr_legacy"), when known. */
+  dataset: string | null;
   /** Whether this is one of the user's own foods. */
   custom: boolean;
   kcalPer100g: number | null;
@@ -98,7 +112,7 @@ const isVisibleTo = (userId: string) => or(isNull(foods.ownerId), eq(foods.owner
 
 async function toFoodListItems(
   db: Database,
-  rows: { id: string; name: string; brand: string | null; source: "usda" | "off" | "custom"; ownerId: string | null }[],
+  rows: { id: string; name: string; brand: string | null; source: "usda" | "off" | "custom"; dataset: string | null; ownerId: string | null }[],
 ): Promise<FoodListItem[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
@@ -120,6 +134,7 @@ async function toFoodListItems(
     name: r.name,
     brand: r.brand,
     source: r.source,
+    dataset: r.dataset,
     custom: r.ownerId !== null,
     kcalPer100g: kcal.get(r.id) ?? null,
     defaultServing: serving.get(r.id) ?? null,
@@ -144,11 +159,37 @@ export async function searchFoods(
     return or(ilike(foods.name, pattern), ilike(foods.brand, pattern));
   });
   const prefix = `${escapeLike(query.trim())}%`;
+
+  // How many query words appear as whole words (plurals allowed) in a piece of the name.
+  const wholeWords = (column: SQL) =>
+    sql.join(
+      words.map((w) => sql`(case when ${column} ~* ${wordPattern(w)} then 1 else 0 end)`),
+      sql` + `,
+    );
+  // USDA names read "category, item, qualifiers" ("Fish, salmon, Atlantic, raw") or
+  // "item, qualifiers" ("Egg, whole, raw"), so the first two comma-separated parts say
+  // what the food is. Words found there count most; that keeps "Eggs" above "Eggnog"
+  // and "Fish, salmon, ..." above "Salmon nuggets, breaded".
+  const inHead = wholeWords(sql`(split_part(${foods.name}, ',', 1) || ' ' || split_part(${foods.name}, ',', 2))`);
+  const inName = wholeWords(sql`${foods.name}`);
+
+  // In priority order:
+  // 1. names containing more of the query's words, as whole words;
+  // 2. the raw form, USDA's base version of a food ("Egg, whole, raw"). It beats dried,
+  //    canned or cooked versions unless the search itself asked for those words, which
+  //    would have scored higher in step 1;
+  // 3. names with the words in their head (see above);
+  // 4. then, only to settle the rest: starts-with, shorter, newer dataset, alphabetical.
   const order =
     words.length > 0
       ? [
+          desc(sql`(${inName})`),
+          sql`(case when ${foods.name} ~* ${RAW_WORD} then 0 else 1 end)`,
+          desc(sql`(${inHead})`),
           sql`(case when ${foods.name} ilike ${prefix} then 0 else 1 end)`,
           sql`length(${foods.name})`,
+          // Only identical names are still tied here: prefer the newer, better-documented Foundation data.
+          sql`(case when ${foods.dataset} = 'foundation' then 0 else 1 end)`,
           asc(foods.name),
         ]
       : [desc(foods.createdAt)];
@@ -158,6 +199,7 @@ export async function searchFoods(
       name: foods.name,
       brand: foods.brand,
       source: foods.source,
+      dataset: foods.dataset,
       ownerId: foods.ownerId,
     })
     .from(foods)
@@ -178,7 +220,7 @@ export async function listRecentFoods(db: Database, userId: string, limit = 12):
     .limit(limit);
   if (recent.length === 0) return [];
   const rows = await db
-    .select({ id: foods.id, name: foods.name, brand: foods.brand, source: foods.source, ownerId: foods.ownerId })
+    .select({ id: foods.id, name: foods.name, brand: foods.brand, source: foods.source, dataset: foods.dataset, ownerId: foods.ownerId })
     .from(foods)
     .where(and(inArray(foods.id, recent.map((r) => r.foodId)), isVisibleTo(userId)));
   const byId = new Map(rows.map((r) => [r.id, r]));
@@ -189,11 +231,29 @@ export async function listRecentFoods(db: Database, userId: string, limit = 12):
   return toFoodListItems(db, ordered);
 }
 
+/** How many shared (imported, not user-owned) foods exist. Zero means no food database has been imported yet. */
+export async function countSharedFoods(db: Database): Promise<number> {
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(foods).where(isNull(foods.ownerId));
+  return row?.n ?? 0;
+}
+
+/** The id of a food the user can see with this barcode, or null. Checked before any network lookup. */
+export async function findFoodByBarcode(db: Database, userId: string, barcode: string): Promise<string | null> {
+  const [row] = await db
+    .select({ id: foods.id })
+    .from(foods)
+    .where(and(eq(foods.barcode, barcode), isVisibleTo(userId)))
+    .limit(1);
+  return row?.id ?? null;
+}
+
 export interface FoodDetail {
   id: string;
   name: string;
   brand: string | null;
   custom: boolean;
+  /** Where the data came from, shown as attribution. */
+  source: "usda" | "off" | "custom";
   servings: { id: string; label: string; grams: number; isDefault: boolean }[];
   /** All nutrient amounts the food reports, per 100 g, keyed by nutrient key. */
   per100g: NutrientAmounts;
@@ -202,7 +262,7 @@ export interface FoodDetail {
 /** One food with its servings and nutrients, or null if it does not exist or is not visible to the user. */
 export async function getFood(db: Database, userId: string, foodId: string): Promise<FoodDetail | null> {
   const [food] = await db
-    .select({ id: foods.id, name: foods.name, brand: foods.brand, ownerId: foods.ownerId })
+    .select({ id: foods.id, name: foods.name, brand: foods.brand, ownerId: foods.ownerId, source: foods.source })
     .from(foods)
     .where(and(eq(foods.id, foodId), isVisibleTo(userId)))
     .limit(1);
@@ -224,6 +284,7 @@ export async function getFood(db: Database, userId: string, foodId: string): Pro
     name: food.name,
     brand: food.brand,
     custom: food.ownerId !== null,
+    source: food.source,
     servings,
     per100g: Object.fromEntries(amounts.map((a) => [a.key, a.amount])),
   };
