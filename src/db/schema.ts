@@ -176,6 +176,50 @@ export const diaryEntries = pgTable(
   ],
 );
 
+/**
+ * A diary day the user has marked complete ("I'm done logging today"). A row
+ * exists only for completed days; removing the row re-opens the day. Completing
+ * a day is a signal for the summary and, later, trends (which should ignore
+ * half-logged days). It does not lock the day: entries can still be edited.
+ */
+export const diaryDays = pgTable(
+  "diary_days",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    entryDate: date("entry_date", { mode: "string" }).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.entryDate] })],
+);
+
+/**
+ * Exercise logged for a day, as calories burned. Deliberately minimal: it
+ * exists so the day summary can show energy out as well as energy in. The gym
+ * tracker (workouts, sets, reps) is a later phase and will add its own tables;
+ * it can link to or feed this one.
+ */
+export const exerciseEntries = pgTable(
+  "exercise_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    entryDate: date("entry_date", { mode: "string" }).notNull(),
+    name: text("name").notNull(),
+    durationMin: doublePrecision("duration_min"),
+    caloriesBurned: doublePrecision("calories_burned").notNull(),
+    loggedAt: timestamp("logged_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("exercise_entries_user_date_idx").on(t.userId, t.entryDate),
+    check("exercise_entries_calories_nonneg", sql`${t.caloriesBurned} >= 0`),
+    check("exercise_entries_duration_pos", sql`${t.durationMin} is null or ${t.durationMin} > 0`),
+  ],
+);
+
 /** A supplement product (multivitamin, vitamin D drops, creatine...). */
 export const supplementProducts = pgTable(
   "supplement_products",

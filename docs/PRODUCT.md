@@ -23,10 +23,34 @@ first-class, and design our own UI. We do not use Cronometer's name, branding, a
 - **Food**: a thing you eat, with nutrients stored **per 100 g** and named **servings**
   ("1 cup" = 240 g).
 - **Diary entry**: a food eaten on a day, in a meal (breakfast / lunch / dinner / snack).
+- **Diary day**: one local calendar day, which can be marked complete.
 - **Supplement product**: a capsule, powder or drop with nutrients stored **per serving**.
 - **Supplement log / stack**: doses you took, and your regular stack for one-tap logging.
 - **Target**: your daily goal for a nutrient, with an optional upper limit.
+- **Exercise entry**: calories burned on a day; it raises that day's calorie budget.
 - **Daily totals**: food + supplements for a day, compared against targets.
+
+## Day Summary
+
+The end-of-day view, opened with the **Summary** button on the diary or by completing the day.
+
+- **Complete day** marks a diary day as done, as in Cronometer. It does not lock anything:
+  entries can still be edited, and the day can be re-opened. Later, trends should ignore days that
+  were never completed.
+- **Calories in and out:** eaten, exercise burned, net (eaten - burned), and the budget
+  (goal + exercise) with what is left or over. Over or under the goal is described neutrally, since
+  eating under goal can be the intention.
+- **Macros:** grams against target, and each macro's share of calories.
+- **By meal:** calories and macros per meal.
+- **Nutrients against targets**, grouped: went well, almost there (70-99%), falling short (under
+  70%, lowest first), over a limit. Limits (sodium, added sugars, saturated fat, cholesterol) are
+  judged the other way round from goals.
+- **Supplements helped:** goals that food alone missed and supplements closed.
+- **Upper limits:** flagged when exceeded. Some limits (magnesium, niacin, vitamin E) apply to
+  supplemental intake only, so food does not count toward them.
+- **Unknown is not zero:** a nutrient that nothing logged reports (a custom food entered with only
+  calories and macros) is shown as *not scored*, never as a deficiency, and is left out of the
+  "targets met" count.
 
 ## Roadmap
 
@@ -34,29 +58,48 @@ first-class, and design our own UI. We do not use Cronometer's name, branding, a
 Next.js + TypeScript + Postgres project, schema and migration, nutrient catalogue (45 nutrients),
 nutrition maths, daily-totals query, tests.
 
-### Phase 1: food diary (MVP)
-- Authentication (see [DECISIONS](DECISIONS.md#auth-undecided))
-- USDA FoodData Central importer: nutrient mapping and portion sizes
-- Food search (Postgres `pg_trgm`) and custom foods
-- Diary page for a given date: four meals, add/edit/delete entries
-- Daily dashboard: calories and macros vs target, micronutrients vs Daily Value
+### Phase 1: food diary (mostly done)
+- [x] Diary page for a given date: four meals, add/edit/delete entries
+- [x] Daily dashboard: calories and macros vs target, micronutrients vs Daily Value
+- [x] Custom foods from label values; food search (every word, name or brand)
+- [x] Day Summary and Complete day
+- [ ] **USDA FoodData Central importer**: nutrient mapping and portion sizes (needs network access
+      and verified nutrient numbers; this is the biggest gap)
+- [ ] Authentication (see [DECISIONS](DECISIONS.md#auth-undecided))
+- [ ] Trigram search (`pg_trgm`) once there are thousands of foods
 
-### Phase 2: supplements
-- Supplement products: enter from a label, per-serving nutrients
-- Your stack, with one-tap "log my morning stack"
-- Daily view split by source: how much of each nutrient came from food vs supplements
-- Upper-limit warnings (a stack can overshoot a nutrient even when food alone would not)
+### Phase 2: supplements (mostly done)
+- [x] Supplement products entered from a label, per-serving nutrients
+- [x] Your stack grouped by time of day, one tap to log what is left
+- [x] Daily view split by source: how much of each nutrient came from supplements
+- [x] Upper-limit warnings for the nutrients where the data model can apply them
+- [ ] Vitamin A and folate limits (need preformed-retinol and folic-acid tracking)
 
-### Phase 3: targets & insights
-- Personalised reference intakes by age and sex (replaces the generic FDA Daily Values)
-- Calorie goal with macro % split (maths exists in `src/lib/nutrition.ts`)
-- Weekly and monthly trends; "nutrient gaps" report
-- Recipes (computed from ingredients), saved meals, copy a day or meal
+### Phase 3: targets & insights (started)
+- [x] Calorie goal with macro % split
+- [x] Edit any nutrient target and upper limit
+- [ ] Personalised reference intakes by age and sex (replaces the generic FDA Daily Values)
+- [ ] Weekly and monthly trends; "nutrient gaps" report
+- [ ] Recipes (computed from ingredients), saved meals, copy a day or meal
 
 ### Phase 4: extras
 - Barcode scanning via Open Food Facts
 - Weight and body measurements; water
-- CSV export; installable PWA
+- CSV export; offline use; installable PWA with a service worker
+
+### Phase 5: fitness (planned)
+The goal is one overall health picture, so the gym and exercise tracker joins the same app.
+Exercise logging today is deliberately minimal (a name, minutes and calories burned) so the Day
+Summary can show energy out as well as in.
+- Workouts with exercises, sets, reps and weight; routines and history
+- Calories burned estimated from the workout rather than typed in
+- Rest timer, progress per lift
+- One health view combining intake, training, weight and trends
+
+## Platform
+
+A mobile-first web app now, a native Android app when the fitness phase needs it. See
+[PLATFORM](PLATFORM.md).
 
 ## Non-goals (for now)
 

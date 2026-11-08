@@ -7,6 +7,8 @@ Source of truth: [`src/db/schema.ts`](../src/db/schema.ts). Migrations live in
 erDiagram
   users ||--o{ diary_entries : logs
   users ||--o{ supplement_logs : takes
+  users ||--o{ diary_days : "completes"
+  users ||--o{ exercise_entries : "burns"
   users ||--o{ user_supplements : "stack"
   users ||--o{ nutrition_targets : sets
   users ||--o{ foods : "owns custom"
@@ -40,6 +42,8 @@ erDiagram
 | `supplement_nutrients` | Nutrient amounts **per serving** |
 | `user_supplements` | A user's regular stack (servings per dose, timing, active) |
 | `supplement_logs` | One dose taken |
+| `diary_days` | A day the user marked complete. A row exists only for completed days; deleting it re-opens the day |
+| `exercise_entries` | Exercise on a day: name, optional minutes, calories burned |
 | `nutrition_targets` | A user's per-nutrient daily target and optional upper limit |
 
 ## Decisions baked into the schema
@@ -55,3 +59,18 @@ erDiagram
 - **Doubles for amounts.** Nutrient data is measured, not money, so `double precision` is fine
   and avoids string conversion in JS.
 - **Check constraints** keep amounts non-negative and quantities/grams positive.
+- **Unknown is not zero.** A nutrient a food does not report has *no row* in `food_nutrients`. A
+  food entered with only calories and macros therefore leaves vitamins unknown, and the summary
+  reports them as "no data" rather than as a deficiency. An explicit `0` is real data.
+- **Custom foods are entered per serving, stored per 100 g.** Labels print per-serving values, so
+  the app converts using the serving's weight. If calories are missing but macros are given, calories
+  are estimated from the macros (4/4/9 kcal per gram) so day totals stay consistent.
+- **Reference values live in the catalogue, not the database.** A nutrient's direction (goal, limit
+  or budget) and its upper limit are in `src/db/nutrient-catalog.ts` and read from there, so
+  correcting one needs no migration. The `nutrients` table is seeded from the catalogue and gives
+  nutrients their ids; it also has a `daily_value` column that is seeded but **not read by the app**
+  (the catalogue is). A user's own targets (`nutrition_targets`) override the catalogue values.
+- **Upper limits have a scope.** `total` compares food + supplements; `supplements` compares
+  supplements only, for limits defined for supplemental intake (magnesium, niacin, vitamin E).
+- **Exercise stays minimal on purpose.** The gym tracker will add its own workout tables rather than
+  stretch this one.

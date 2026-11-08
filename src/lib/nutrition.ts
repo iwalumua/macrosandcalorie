@@ -92,6 +92,34 @@ export function macroGramsFromSplit(kcal: number, split: MacroSplit): NutrientAm
   };
 }
 
+/**
+ * The whole-number protein/carbs/fat percent split that a set of gram targets
+ * works out to, measured against the calories those macros supply. Always sums
+ * to exactly 100 (largest-remainder rounding), or is all zeros for no grams.
+ * The inverse of `macroGramsFromSplit`, for showing existing targets as a split.
+ */
+export function macroSplitFromGrams(grams: { protein: number; carbs: number; fat: number }): MacroSplit {
+  const kcal = {
+    protein: Math.max(0, grams.protein) * KCAL_PER_GRAM.protein,
+    carbs: Math.max(0, grams.carbs) * KCAL_PER_GRAM.carbs,
+    fat: Math.max(0, grams.fat) * KCAL_PER_GRAM.fat,
+  };
+  const total = kcal.protein + kcal.carbs + kcal.fat;
+  if (total === 0) return { protein: 0, carbs: 0, fat: 0 };
+
+  const keys = ["protein", "carbs", "fat"] as const;
+  const exact = keys.map((k) => (kcal[k] / total) * 100);
+  const floored = exact.map(Math.floor);
+  let remainder = 100 - floored.reduce((a, b) => a + b, 0);
+  const byFraction = exact.map((v, i) => ({ i, frac: v - Math.floor(v) })).sort((a, b) => b.frac - a.frac);
+  for (const { i } of byFraction) {
+    if (remainder <= 0) break;
+    floored[i] = floored[i]! + 1;
+    remainder--;
+  }
+  return { protein: floored[0]!, carbs: floored[1]!, fat: floored[2]! };
+}
+
 /** Round for display (not for storage or intermediate maths). */
 export function round(value: number, decimals = 1): number {
   const f = 10 ** decimals;

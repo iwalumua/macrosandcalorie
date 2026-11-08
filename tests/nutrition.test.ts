@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   macroCalorieSplit,
   macroGramsFromSplit,
+  macroSplitFromGrams,
   percentOfTarget,
   round,
   scalePer100g,
@@ -72,6 +73,38 @@ describe("macro calories", () => {
 
   it("rejects a split that does not sum to 100", () => {
     expect(() => macroGramsFromSplit(2000, { protein: 30, carbs: 30, fat: 30 })).toThrow(RangeError);
+  });
+});
+
+describe("macroSplitFromGrams", () => {
+  it("always returns whole percents that sum to exactly 100", () => {
+    for (let p = 0; p <= 300; p += 7) {
+      for (let c = 0; c <= 400; c += 11) {
+        for (let f = 0; f <= 150; f += 5) {
+          if (p + c + f === 0) continue;
+          const s = macroSplitFromGrams({ protein: p, carbs: c, fat: f });
+          expect(s.protein + s.carbs + s.fat, `${p}/${c}/${f}`).toBe(100);
+          expect(Number.isInteger(s.protein) && Number.isInteger(s.carbs) && Number.isInteger(s.fat)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("round-trips a split through grams", () => {
+    const grams = macroGramsFromSplit(2000, { protein: 30, carbs: 40, fat: 30 });
+    expect(macroSplitFromGrams({ protein: grams.protein!, carbs: grams.carbs!, fat: grams.fat! })).toEqual({
+      protein: 30,
+      carbs: 40,
+      fat: 30,
+    });
+  });
+
+  it("describes the generic Daily Values (50 g protein, 275 g carbs, 78 g fat) as about 10/55/35", () => {
+    expect(macroSplitFromGrams({ protein: 50, carbs: 275, fat: 78 })).toEqual({ protein: 10, carbs: 55, fat: 35 });
+  });
+
+  it("is all zeros when there are no grams", () => {
+    expect(macroSplitFromGrams({ protein: 0, carbs: 0, fat: 0 })).toEqual({ protein: 0, carbs: 0, fat: 0 });
   });
 });
 
