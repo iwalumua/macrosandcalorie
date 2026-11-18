@@ -1,0 +1,44 @@
+{
+  "enabledPlugins": {
+    "superpowers@superpowers-dev": true,
+    "mattpocock-skills@mattpocock": true,
+    "agent-skills@addy-agent-skills": true,
+    "ecc@ecc": true,
+    "engineering-skills@claude-code-skills": true,
+    "engineering-advanced-skills@claude-code-skills": true,
+    "product-skills@claude-code-skills": true,
+    "pm-skills@claude-code-skills": true
+  },
+  "extraKnownMarketplaces": {
+    "superpowers-dev": {
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers"
+      }
+    },
+    "mattpocock": {
+      "source": {
+        "source": "github",
+        "repo": "mattpocock/skills"
+      }
+    },
+    "addy-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "addyosmani/agent-skills"
+      }
+    },
+    "ecc": {
+      "source": {
+        "source": "github",
+        "repo": "affaan-m/everything-claude-code"
+      }
+    },
+    "claude-code-skills": {
+      "source": {
+        "source": "github",
+        "repo": "alirezarezvani/claude-skills"
+      }
+    }
+  }
+}
